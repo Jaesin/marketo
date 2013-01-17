@@ -1184,7 +1184,7 @@ class mktSampleMktowsClient
       
       $ok = false;
       $errCode = 1;
-      $faultCode == null;
+      $faultCode = null;
       if (!empty($ex->detail->serviceException->code)) {
         $errCode = $ex->detail->serviceException->code;
       }
@@ -1220,6 +1220,7 @@ class mktSampleMktowsClient
       var_dump($ex);
       exit(1);
     }
+    //TO DO, when no api keys are set, this doesn't get set previously
     return $success;
   }
 
