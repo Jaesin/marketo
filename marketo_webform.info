@@ -1,0 +1,5 @@
+name = Marketo Webform Integration
+description = Marketo Munchkin Webform Integration
+core = 7.x
+package = Marketo
+dependencies[] = webform
