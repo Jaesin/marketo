@@ -1,0 +1,132 @@
+<?php
+/**
+ * @file
+ * Marketo Integration
+ */
+
+/**
+ * Implements hook_menu()
+ */
+function marketo_menu() {
+  $items = array();
+  $items['admin/config/services/marketo'] = array(
+    'title' => t('Marketo Integration'),
+    'description' => t('Marketo integration settings page.'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('marketo_settings_form'),
+    'access arguments' => array('administer marketo'),
+    'file' => 'marketo.admin.inc',
+  );
+  return $items;
+}
+
+/**
+ * Implements hook_permission().
+ */
+function marketo_permission() {
+  $perms = array(
+    'administer marketo' => array(
+      'title' => t('Administer Marketo'),
+      'description' => t('Administer Marketo integration and SOAP API.'),
+    ),
+  );
+  return $perms;
+}
+
+/**
+ * Register data to be submitted to marketo.
+ *
+ * @param $key
+ *   The marketo primary key (usually an e-mail address)
+ * @param $data
+ *   An array of key-value pairs to be submitted.  The key must correspond to a marketo field name.
+ * @param $override
+ *   When TRUE (the default), any previously set fields will be overridden.  When false, only
+ *   uninitialized fields will be set.
+ * @return
+ *   The current data to be submitted, an array of the form:
+ *   'key' => The primary key.
+ *   'data' => An array of key value pairs specifying the fields to be submitted.
+ */
+function marketo_data($key = NULL, $data = NULL, $override = TRUE) {
+  //if (empty($_SESSION['marketo'])) $_SESSION['marketo'] = array('key' => NULL, 'data' => array());
+  //$request_data =& $_SESSION['marketo'];
+  $request_data =& drupal_static('marketo', array('key' => NULL, 'data' => array()));
+
+  // Set a key, if specified.
+  if (!empty($key)) {
+    $request_data['key'] = $key;
+  }
+
+  // Add data, if specified
+  if (!empty($data)) {
+    if ($override) {
+      // These data values should overwrite existing.
+      $request_data['data'] = $data + $request_data['data'];
+    }
+    else {
+      // These data values should be treated as defaults.
+      $request_data['data'] += $data;
+    }
+  }
+
+  // Register with munchkin that we have some data to send.
+  if (module_exists('marketo_munchkin') && !empty($request_data['key']) && !empty($request_data['data']) && !variable_get('marketo_soap', TRUE)) {
+    $_SESSION['marketo-munchkin-submit'] = 'marketo';
+    $_SESSION['marketo-munchkin-data-user-email'] = $request_data['key'];
+  }
+
+  return $request_data;
+}
+
+/**
+ * Implements hook_exit()
+ * Actually submit our data to marketo (if we are using soap).
+ */
+function marketo_exit() {
+  if (variable_get('marketo_soap', TRUE) || !module_exists('marketo_munchkin')) {
+    $request_data = marketo_data();
+    drupal_alter('marketo_data', $request_data['data'], $request_data['key']);
+    if (!empty($request_data['key']) && !empty($request_data['data'])) {
+      marketo_soap($request_data['key'], $request_data['data']);
+    }
+  }
+}
+
+/**
+ * Implements hook_marketo_create_TYPE_data().
+ * Registers our data for submission via marketo_munchkin
+ */
+function marketo_marketo_create_marketo_data(&$munchkin_data) {
+  if (!variable_get('marketo_soap', TRUE)) {
+    $request_data = marketo_data();
+    drupal_alter('marketo_data', $request_data['data'], $request_data['key']);
+    foreach ($request_data['data'] as $name => $value) {
+      $munchkin_data[$name] = $value;
+    }
+  }
+}
+
+/**
+ * Implements hook_marketo_data_alter().
+ * Add in any default fields.
+ */
+function marketo_marketo_data_alter(&$data, $key) {
+  $data += variable_get('marketo_default_fields', array());
+}
+
+/**
+ * Submits data to marketo via soap.
+ */
+function marketo_soap($key, $data) {
+  module_load_include('inc', 'marketo', 'includes/marketo.soap');
+  $accessKey = variable_get('marketo_soap_access_key', '');
+  $secretKey = variable_get('marketo_soap_secret_key', '');
+  $soapEndPoint = variable_get('marketo_soap_endpoint', 'https://na-k.marketo.com/soap/mktows/1_6');
+  $client = new mktSampleMktowsClient($accessKey, $secretKey, $soapEndPoint);
+  watchdog("marketo", "Marketo client status: " . print_r($client, TRUE));
+  watchdog("marketo", "Data sent to marketo: Email: " . $key . ", Data: " . print_r($data, TRUE));
+  $result = $client->syncLead($key, $data);
+  watchdog("marketo", "Data recieved from marketo: " . print_r($result, TRUE));
+  return $result;
+} 

@@ -6,35 +6,6 @@
 define('MARKETO_WEBFORM_DELIMITER', ',');
 
 /**
- * Implements hook_menu()
- */
-function marketo_webform_menu() {
-  $items = array();
-  $items['admin/config/services/marketo-webform'] = array(
-    'title' => t('Marketo Webform'),
-    'description' => t('Marketo Webform Settings page.'),
-    'page callback' => 'drupal_get_form',
-    'page arguments' => array('marketo_webform_settings_form'),
-    'access arguments' => array('administer marketo webform'),
-    'file' => 'marketo_webform.admin.inc',
-  );
-  return $items;
-}
-
-/**
- * Implements hook_permission().
- */
-function marketo_webform_permission() {
-  $perms = array(
-    'administer marketo webform' => array(
-      'title' => t('Administer Marketo Webform'),
-      'description' => t('Administer the Marketo/Webform integration and SOAP API.'),
-    ),
-  );
-  return $perms;
-}
-
-/**
  * Implements hook_form_FORM_ID_alter for the webform component edit form.
  *
  * Provide fields to tag components for submission to Marketo.
@@ -103,51 +74,6 @@ function marketo_webform_webform_submission_insert($node, $submission) {
     }
   }
   if ($key) {
-    $context = compact('key', 'node', 'submission');
-    drupal_alter('marketo_webform_data', $data, $context);
-    if (variable_get('marketo_webform_soap', TRUE)) {
-      marketo_webform_soap($key, $data);
-    }
-    elseif (module_exists('marketo_munchkin')) {
-      $_SESSION['marketo-munchkin-submit'] = 'webform';
-      $_SESSION['marketo-munchkin-data-user_email'] = $key;
-      $_SESSION['marketo-webform-data'] = $data;
-    }
-  }
-}
-
-function marketo_webform_soap($key, $data) {
-  module_load_include('inc', 'marketo_webform', '../includes/marketo.soap');
-  //$default = array(
-  //  'oid' => variable_get('webform_marketoiin_salesforce_oid', '00D500000007Sev'),
-  //);
-  //$data += $default;
-
-  // There should always be a lead source.
-  //if (!array_key_exists('LeadSource', $output_data) || empty($output_data['LeadSource'])) $output_data['LeadSource'] = 'Unknown';
-  //$output_data['mkto2__Original_Source_Info__pc'] = $_SERVER["SERVER_NAME"] . $_SERVER['REQUEST_URI'];
-  //$output_data['Initial_IP_Address__c'] = $_SERVER['REMOTE_ADDR'];
-
-  $accessKey = variable_get('marketo_webform_soap_access_key', '');
-  $secretKey = variable_get('marketo_webform_soap_secret_key', '');
-  $soapEndPoint = variable_get('marketo_webform_soap_endpoint', 'https://na-k.marketo.com/soap/mktows/1_6');
-  $client = new mktSampleMktowsClient($accessKey, $secretKey, $soapEndPoint);
-  watchdog("marketo", "Marketo client status: " . print_r($client, TRUE));
-  watchdog("marketo", "Data sent to marketo: Email: " . $key . ", Data: " . print_r($data, TRUE));
-  $result = $client->syncLead($key, $data);
-  watchdog("marketo", "Data recieved from marketo: " . print_r($result, TRUE));
-  return $result;
-} 
-
-
-/**
- * Implements hook_marketo_create_TYPE_data().
- */
-function marketo_webform_marketo_create_webform_data(&$munchkin_data) {
-  if (isset($_SESSION['marketo-webform-data'])) {
-    foreach ($_SESSION['marketo-webform-data'] as $name => $value) {
-      $munchkin_data[$name] = $value;
-    }
-    unset($_SESSION['marketo-webform-data']);
+    marketo_data($key, $data);
   }
 }

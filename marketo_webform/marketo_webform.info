@@ -1,5 +1,6 @@
 name = Marketo Webform Integration
-description = Marketo Munchkin Webform Integration
+description = Provides integration between webform submissions and Marketo
 core = 7.x
 package = Marketo
 dependencies[] = webform
+dependencies[] = marketo
