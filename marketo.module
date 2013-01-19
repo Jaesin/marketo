@@ -76,8 +76,19 @@ function marketo_data($key = NULL, $data = NULL, $override = TRUE) {
     $_SESSION['marketo-munchkin-data-user-email'] = $request_data['key'];
   }
 
-  return $request_data;
+  if (empty($data) && empty($key)) {
+    $return = $request_data;
+    unset($request_data);
+    if (!empty($return['key']) && !empty($return['data'])) {
+      drupal_alter('marketo_data', $return['data'], $return['key']);
+      return $return;      
+    }
+    else {
+      return FALSE;
+    }
+  }
 }
+  
 
 /**
  * Implements hook_exit()
@@ -85,9 +96,7 @@ function marketo_data($key = NULL, $data = NULL, $override = TRUE) {
  */
 function marketo_exit() {
   if (variable_get('marketo_soap', TRUE) || !module_exists('marketo_munchkin')) {
-    $request_data = marketo_data();
-    drupal_alter('marketo_data', $request_data['data'], $request_data['key']);
-    if (!empty($request_data['key']) && !empty($request_data['data'])) {
+    if($request_data = marketo_data()) {
       marketo_soap($request_data['key'], $request_data['data']);
     }
   }
@@ -100,7 +109,6 @@ function marketo_exit() {
 function marketo_marketo_create_marketo_data(&$munchkin_data) {
   if (!variable_get('marketo_soap', TRUE)) {
     $request_data = marketo_data();
-    drupal_alter('marketo_data', $request_data['data'], $request_data['key']);
     foreach ($request_data['data'] as $name => $value) {
       $munchkin_data[$name] = $value;
     }
