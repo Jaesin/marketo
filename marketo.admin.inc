@@ -88,5 +88,5 @@ function marketo_settings_form_validate($form, &$form_state) {
       $fields[$name] = $value;
     }
   }
-  $form_state['values'][marketo_default_fields] = $fields;
+  $form_state['values']['marketo_default_fields'] = $fields;
 }
