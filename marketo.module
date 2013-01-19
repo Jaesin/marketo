@@ -112,7 +112,11 @@ function marketo_marketo_create_marketo_data(&$munchkin_data) {
  * Add in any default fields.
  */
 function marketo_marketo_data_alter(&$data, $key) {
-  $data += variable_get('marketo_default_fields', array());
+  $fields = variable_get('marketo_default_fields', array());
+  foreach ($fields as $name => $value) {
+    $fields[$name] = token_replace($value, array(), array('clear' => TRUE));
+  }
+  $data += $fields;
 }
 
 /**
