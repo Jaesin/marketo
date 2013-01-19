@@ -85,7 +85,7 @@ function marketo_settings_form_validate($form, &$form_state) {
     list($name, $value) = explode('|', $line);
     $name = trim($name);
     if (!empty($name)) {
-      $fields[$name] = $value;
+      $fields[$name] = trim($value);
     }
   }
   $form_state['values']['marketo_default_fields'] = $fields;
