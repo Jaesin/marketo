@@ -45,6 +45,12 @@ function marketo_settings_form() {
     '#description' => t('The SOAP API Secret Key for your Marketo Instance'),
     '#default_value' => variable_get('marketo_soap_secret_key', ''),
   );
+  $form['marketo_soap_proxy'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Proxy data to marketo asynchronously.'),
+    '#description' => t('The Marketo SOAP API can have very long response times.  Select this option to cause data sent to Marketo to be relayed by an asynchronous service. The details of the SOAP transaction will still be logged, but the page load time for your users will be significantly improved.'),
+    '#default_value' => variable_get('marketo_soap_proxy', FALSE),
+  );
 
   $form['default_fields'] = array(
     '#type' => 'fieldset',

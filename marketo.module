@@ -17,7 +17,163 @@ function marketo_menu() {
     'access arguments' => array('administer marketo'),
     'file' => 'marketo.admin.inc',
   );
+  $items['marketo/proxy'] = array(
+    'title' => t('Marketo asynchronous proxy service'),
+    'page callback' => 'marketo_proxy',
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+  );
+  $items['marketo/proxy-invoke'] = array(
+      'title' => t('Marketo asynchronous proxy service'),
+      'page callback' => 'marketo_proxy_invoke_test',
+      'access arguments' => array('administer marketo'),
+      'type' => MENU_CALLBACK,
+  );
+
   return $items;
+}
+
+/**
+ * Menu callback to test markeot data proxy.
+ */
+function marketo_proxy_invoke_test() {
+  $key = empty($_GET['Email']) ? 'test@test.com' : $_GET['email'];
+  $fields = $_GET;
+  unset($fields['Email']);
+  unset($fields['q']);
+  if (empty($fields)) {
+    echo 'No data to relay.';
+  }
+  marketo_proxy_invoke($key, $fields);
+  echo "Relayed to $key: ";
+  echo '<pre>';
+  print_r($fields);
+  echo '</pre>';
+  die;
+}
+
+/**
+ * Utility function to validate the marketo proxy authentication header.
+ *
+ * Header must be of the format: "X-Marketo-Auth: timestamp;h(timestamp)" where timestamp is
+ * the UNIX timestamp of the request, and h(timestamp) is the sha256 hmac of the timestamp
+ * using the Marketo SOAP secret key.  Additionally, the timestamp must be recent
+ * enough, as determined by the marketo_proxy_expiration system variable.
+ *
+ * @return boolean
+ *   TRUE if the authentication header validates, FALSE otherwise.
+ */
+function _marketo_proxy_auth() {
+  if (empty($_SERVER['HTTP_X_MARKETO_AUTH'])) {
+    watchdog('marketo', 'Missing authentication header: <pre>@post</pre>', array('@post' => print_r($_REQUEST, TRUE)), WATCHDOG_WARNING);
+    return FALSE;
+  }
+  $token = $_SERVER['HTTP_X_MARKETO_AUTH'];
+  // We use the marketo SOAP secret key to hash
+  $key = variable_get('marketo_soap_secret_key', '');
+  @list($time, $hash) = explode(';', $token);
+  if (empty($time) || empty($hash)) {
+    watchdog('marketo', 'Incomplete authentication header @tok: <pre>@post</pre>', array('@tok' => $token, '@post' => print_r($_REQUEST, TRUE)), WATCHDOG_WARNING);
+    return FALSE;
+  }
+  if ($hash != hash_hmac('sha256', $time, $key)) {
+    watchdog('marketo', 'Invalid authentication header @tok: <pre>@post</pre>', array('@tok' => $token, '@post' => print_r($_REQUEST, TRUE)), WATCHDOG_WARNING);
+    return FALSE;
+  }
+  if (($time > REQUEST_TIME) || ($time < REQUEST_TIME - variable_get('marketo_proxy_expiration', 5))) {
+    watchdog('marketo', 'Expired authentication header @tok: <pre>@post</pre>', array('@tok' => $token, '@post' => print_r($_REQUEST, TRUE)), WATCHDOG_WARNING);
+    return FALSE;
+  }
+  return TRUE;
+}
+
+/**
+ * Invoke the marketo data proxy service asynchronously.
+ *
+ * @param $key
+ *   The marketo lead sync key (usually email address, but may also be lead id).
+ * @param $params
+ *   Associative array of fields and values to be submitted.
+ * @param $url
+ *   The URL of the service endpoint.  Defaults to the endpoint on this site.
+ */
+function marketo_proxy_invoke($key, $params, $url = NULL) {
+  // URL defaults to this site
+  if (empty($url)) {
+    $url = url('marketo/proxy', array('absolute' => TRUE));
+  }
+
+  // Generate an authentication token.  We use the marketo soap secret key.
+  $time = time();
+  $auth = $time . ';' . hash_hmac('sha256', $time, variable_get('marketo_soap_secret_key', ''));
+
+  // Create the POST data param string.
+  $post_params = array();
+  foreach ($params as $field => $val) {
+    $post_params[] = $field . '=' . urlencode($val);
+  }
+  $post_string = implode('&', $post_params);
+
+  // Try to open a socket.
+  $parts=parse_url($url);
+  $fp = fsockopen($parts['host'], isset($parts['port']) ? $parts['port'] : 80, $errno, $errstr, 30);
+  if (!$fp) {
+    watchdog('marketo', 'Unable to open a socket to marketo proxy service: <pre>@post</pre>', array('@post' => $_POST), 'error');
+    return FALSE;
+  }
+
+  // Build the HTTP Request.
+  $out = "POST " . $parts['path'] . " HTTP/1.1\r\n";
+  $out .= "Host: " . $parts['host'] . "\r\n";
+  $out .= "Content-Type: application/x-www-form-urlencoded\r\n";
+  $out .= "Content-Length: ".strlen($post_string) . "\r\n";
+  $out .= 'X-Marketo-Key: ' . $key . "\r\n";
+  $out .= 'X-Marketo-Auth: ' . $auth."\r\n";
+  // Be sure to relay the tracking cookie, so the submitted data are properly associated with
+  // this lead's website activity.
+  if (isset($_COOKIE['_mkto_trk'])) {
+    $out .= 'Cookie: _mkto_trk=' . $_COOKIE['_mkto_trk'] . "\r\n";
+  }
+  $out.= "Connection: Close\r\n\r\n";
+  if (isset($post_string)) $out.= $post_string;
+  watchdog('marketo', 'Data proxy to marketo at @time: <pre>@out</pre>', array('@time' => time(), '@out' => $out));
+
+  // Write to the socket and head for the hills.  Our work is done.
+  fwrite($fp, $out);
+  fclose($fp);
+}
+
+/**
+ * Service page callback to proxy data to Marketo.
+ */
+function marketo_proxy() {
+  // We only accept POSTs here.
+  if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    drupal_not_found();
+  }
+
+  // Can't submit without a key (usually the email, sometimes the lead-id).
+  if (empty($_SERVER['HTTP_X_MARKETO_KEY'])) {
+    drupal_json_output(array('success' => 'false', 'message' => 'Missing X-Marketo-Key header.'));
+    die;
+  }
+
+  // Make sure the authentication token is correct.
+  if (!_marketo_proxy_auth()) {
+    drupal_json_output(array('success' => 'false', 'message' => 'Bad or missing X-Marketo-Auth header.'));
+    die;
+  }
+
+  // Invoke Marketo SOAP (keep track of the egregious latency!)
+  $start = time();
+  $result = marketo_soap($_SERVER['HTTP_X_MARKETO_KEY'], $_POST);
+  if (!empty($result)) {
+    drupal_json_output(array('success' => 'true', 'elap' => time() - $start) + (array)$result);
+  }
+  else {
+    drupal_json_output(array('success' => 'false', 'elap' => time() - $start, 'message' => 'Marketo SOAP error.'));
+  }
+  die;
 }
 
 /**
@@ -97,7 +253,12 @@ function marketo_data($key = NULL, $data = NULL, $override = TRUE) {
 function marketo_exit() {
   if (variable_get('marketo_soap', TRUE) || !module_exists('marketo_munchkin')) {
     if($request_data = marketo_data()) {
-      marketo_soap($request_data['key'], $request_data['data']);
+      if (!variable_get('marketo_soap_proxy', FALSE)) {
+        marketo_soap($request_data['key'], $request_data['data']);
+      }
+      else {
+        marketo_proxy_invoke($request_data['key'], $request_data['data']);
+      }
     }
   }
 }
@@ -136,9 +297,9 @@ function marketo_soap($key, $data) {
   $secretKey = variable_get('marketo_soap_secret_key', '');
   $soapEndPoint = variable_get('marketo_soap_endpoint', 'https://na-k.marketo.com/soap/mktows/1_6');
   $client = new mktSampleMktowsClient($accessKey, $secretKey, $soapEndPoint);
-  watchdog("marketo", "Marketo client status: " . print_r($client, TRUE));
-  watchdog("marketo", "Data sent to marketo: Email: " . $key . ", Data: " . print_r($data, TRUE));
+  $start = time();
+  watchdog("marketo", "Data sent to marketo at @time: Email: @key, Data: <pre>@data</data>", array('@time' => $start, '@key' => $key, '@data' => print_r($data, TRUE)));
   $result = $client->syncLead($key, $data);
-  watchdog("marketo", "Data recieved from marketo: " . print_r($result, TRUE));
+  watchdog("marketo", "Data recieved from marketo at @time (@secs): <pre>@data</pre>", array('@time' => time(), '@secs' => time() - $start, '@data' => print_r($result, TRUE)));
   return $result;
 }
