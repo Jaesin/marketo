@@ -69,17 +69,19 @@ function marketo_settings_form() {
     //'#title' => t('Default fields'),
     '#default_value' => implode("\n", $lines),
   );
-  $form['default_fields']['token_help'] = array(
-    '#type' => 'fieldset',
-    '#title' => t('Available tokens'),
-    '#collapsible' => TRUE,
-    '#collapsed' => TRUE,
-    '#weight' => 100,
-  );
-  $form['default_fields']['token_help']['tree'] = array(
-    '#theme' => 'token_tree',
-    '#token_types' => array('global'),
-  );
+  if (module_exists('token')) {
+    $form['default_fields']['token_help'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Available tokens'),
+      '#collapsible' => TRUE,
+      '#collapsed' => TRUE,
+      '#weight' => 100,
+    );
+    $form['default_fields']['token_help']['tree'] = array(
+      '#theme' => 'token_tree',
+      '#token_types' => array('global'),
+    );
+  }
   $form['#validate'] = array('marketo_settings_form_validate');
   return system_settings_form($form);
 }
