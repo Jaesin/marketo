@@ -3,7 +3,7 @@
  * @file
  * Marketo Webform Integration
  */
-define('MARKETO_WEBFORM_DELIMITER', ',');
+define('MARKETO_WEBFORM_DELIMITER', ';');
 
 /**
  * Implements hook_form_FORM_ID_alter for the webform component edit form.
