@@ -285,7 +285,7 @@ function marketo_marketo_data_alter(&$data, $key) {
   foreach ($fields as $name => $value) {
     $fields[$name] = token_replace($value, array(), array('clear' => TRUE));
   }
-  $data += array_filter($fields);
+  $data = array_filter($data) + array_filter($fields);
 }
 
 /**
