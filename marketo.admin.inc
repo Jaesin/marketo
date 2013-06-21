@@ -86,12 +86,17 @@ function marketo_settings_form() {
 
 function marketo_settings_form_validate($form, &$form_state) {
   $fields = array();
-  $list = explode("\n", $form_state['values']['marketo_default_fields']);
-  foreach ($list as $line) {
-    list($name, $value) = explode('|', $line);
-    $name = trim($name);
-    if (!empty($name)) {
-      $fields[$name] = trim($value);
+  $text = @trim($form_state['values']['marketo_default_fields']);
+  if (!empty($text)) {
+    $list = explode("\n", $text);
+    foreach ($list as $line) {
+      @list($name, $value) = explode('|', $line);
+      $name = @trim($name);
+      $value = @trim($value);
+      if (empty($name) || empty($value)) {
+        form_set_error('marketo_default_fields', t('You must specify default fields one per line as a name/value pair separated by a pipe (|) character.'));
+        return;
+      }
     }
   }
   $form_state['values']['marketo_default_fields'] = $fields;
