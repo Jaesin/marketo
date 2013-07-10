@@ -99,6 +99,10 @@ function marketo_settings_form_validate($form, &$form_state) {
         form_set_error('marketo_default_fields', t('You must specify default fields one per line as a name/value pair separated by a pipe (|) character.'));
         return;
       }
+      } 
+      else {
+			  $fields[$name] = trim($value);
+      }
     }
   }
   $form_state['values']['marketo_default_fields'] = $fields;
