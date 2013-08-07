@@ -27,6 +27,7 @@ function marketo_settings_form() {
       '#markup' => '<em>' . t('Enable the @m module to use the Marketo Munchkin API', array('@m' => 'marketo_munchkin')) . '</em>',
     );
   }
+
   $form['marketo_soap_endpoint'] = array(
     '#type' => 'textfield',
     '#title' => t('Marketo SOAP API Endpoint'),
@@ -51,7 +52,12 @@ function marketo_settings_form() {
     '#description' => t('The Marketo SOAP API can have very long response times.  Select this option to cause data sent to Marketo to be relayed by an asynchronous service. The details of the SOAP transaction will still be logged, but the page load time for your users will be significantly improved.'),
     '#default_value' => variable_get('marketo_soap_proxy', FALSE),
   );
-
+  $form['marketo_proxy_absolute_url'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Absolute Path to internal proxy invocation '),
+    '#description' => t('The absolute base URL to be used for the proxy invocation page. Sometimes you might have a redirect going on and url() won\'t know how to handle it. Trailing slash not needed.'),
+    '#default_value' => variable_get('marketo_proxy_absolute_url', ''),
+  );
   $form['default_fields'] = array(
     '#type' => 'fieldset',
     '#tree' => FALSE,

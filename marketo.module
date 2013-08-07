@@ -34,7 +34,7 @@ function marketo_menu() {
 }
 
 /**
- * Menu callback to test markeot data proxy.
+ * Menu callback to test marketo data proxy.
  */
 function marketo_proxy_invoke_test() {
   $key = empty($_GET['Email']) ? 'test@test.com' : $_GET['email'];
@@ -44,7 +44,7 @@ function marketo_proxy_invoke_test() {
   if (empty($fields)) {
     echo 'No data to relay.';
   }
-  marketo_proxy_invoke($key, $fields);
+  marketo_proxy_invoke($key, $fields, variable_get('marketo_proxy_absolute_url', NULL));
   echo "Relayed to $key: ";
   echo '<pre>';
   print_r($fields);
@@ -101,6 +101,9 @@ function marketo_proxy_invoke($key, $params, $url = NULL) {
   // URL defaults to this site
   if (empty($url)) {
     $url = url('marketo/proxy', array('absolute' => TRUE));
+  }
+  else {
+	  $url .= '/marketo/proxy';
   }
 
   // Generate an authentication token.  We use the marketo soap secret key.
@@ -257,7 +260,7 @@ function marketo_exit() {
         marketo_soap($request_data['key'], $request_data['data']);
       }
       else {
-        marketo_proxy_invoke($request_data['key'], $request_data['data']);
+        marketo_proxy_invoke($request_data['key'], $request_data['data'], variable_get('marketo_proxy_absolute_url', NULL));
       }
     }
   }
