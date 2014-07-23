@@ -284,11 +284,23 @@ function marketo_marketo_create_marketo_data(&$munchkin_data) {
  * Add in any default fields.
  */
 function marketo_marketo_data_alter(&$data, $key) {
+
   $fields = variable_get('marketo_default_fields', array());
+  $arg1 = arg(1);
+  //make sure any url parameters are added back to the $_GET array 
+  //so that tokens can be processed as they are on normally processed forms
+  if ($arg1 == 'ajax' && isset($_POST['ajax_page_state'])) {
+    $url_parts = drupal_parse_url($_POST['ajax_form_url']);
+    foreach($url_parts['query'] as $key => $value) {
+      $_GET[$key] = check_plain($value);
+    }
+  }
   foreach ($fields as $name => $value) {
     $fields[$name] = token_replace($value, array(), array('clear' => TRUE));
   }
-  $data = array_filter($data) + array_filter($fields);
+
+  $data = array_filter($data) + array_filter($fields);  
+
 }
 
 /**
@@ -305,4 +317,32 @@ function marketo_soap($key, $data) {
   $result = $client->syncLead($key, $data);
   watchdog("marketo", "Data recieved from marketo at @time (@secs): <pre>@data</pre>", array('@time' => time(), '@secs' => time() - $start, '@data' => print_r($result, TRUE)));
   return $result;
+}
+
+/**
+ * Implementation of hook_module_implements_alter().
+ *
+ * Make sure our custom ajax field in the alter gets added last
+ */
+function marketo_module_implements_alter(&$implementations, $hook) {
+	//make sure our custom form_alter happens and webform_ajax's does not.
+	if ($hook == 'form_alter') {
+		$temp_impl = $implementations['marketo'];
+		unset($implementations['marketo']);
+		$implementations['marketo'] = FALSE;
+	}
+}
+
+/**
+ * Implementation of hook_form_alter().
+ */
+function marketo_form_alter(&$form, &$form_state, $form_id) {
+  if (isset($form['actions']['submit']['#ajax'])) {
+    //add a hidden field to capture the URL of the page upon which the form is loaded and completed
+    //by the user since some tokens may be looking for values in the URL in the default fields settings
+    $form['ajax_form_url'] = array(
+      '#type' => 'hidden',
+      '#value' => $_SERVER['HTTP_HOST'] . request_uri(),
+    );
+  }
 }
