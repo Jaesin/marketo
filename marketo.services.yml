@@ -1,0 +1,5 @@
+services:
+  marketo.client:
+    class: Drupal\marketo\SoapClient
+    arguments: ["@config.factory"]
+

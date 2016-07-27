@@ -1,0 +1,14 @@
+{
+  "name": "drupal/marketo",
+  "type": "drupal-module",
+  "description": "Suite of modules providing integration with the Marketo email marketing platform.",
+  "keywords": ["Drupal"],
+  "license": "GPL-2.0+",
+  "homepage": "https://www.drupal.org/project/marketo",
+  "minimum-stability": "dev",
+  "support": {
+    "issues": "https://www.drupal.org/project/issues/marketo",
+    "source": "http://cgit.drupalcode.org/marketo"
+  },
+  "require": { }
+}

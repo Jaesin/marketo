@@ -1,6 +1,0 @@
-name = Marketo User Integration
-description = Marketo Munchkin User Integration
-core = 7.x
-package = Marketo
-
-configure = admin/config/services/marketo-user

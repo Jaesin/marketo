@@ -1,5 +1,0 @@
-name = Marketo Integration
-description = Suite of modules providing integration with the Marketo email marketing platform.
-core = 7.x
-package = Marketo
-configure = admin/config/services/marketo
